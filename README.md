@@ -8,7 +8,7 @@ Um roguelike simples feito em Python com PgZero., para o teste técnico da kodla
 pip install pgzero pygame
 
 2. Execute o jogo:
-python -m pgzero main.py 
+$env:PYTHONUTF8=1; python -m pgzero main.py (como o programa possui caracteres especiais, simbolos etc, vamos forçar ele a rodar em UTF8)
 
 
 ## Controles
