@@ -82,41 +82,42 @@ class Hero:
         self.speed = 5.5
         self.sprites = {
             "idle": ["hero_idle1", "hero_idle2", "hero_idle3"],
-            "walk": ["hero_walk1", "hero_walk2", "hero_walk3", "hero_walk2"]
+            "walk": ["hero_walk1", "hero_walk2", "hero_walk3"],
+            "idle_left": ["hero_idle1left", "hero_idle2left", "hero_idle3left"],
+            "walk_left": ["hero_walk1left", "hero_walk2left", "hero_walk3left"]
         }
         self.anim_state = "idle"
         self.anim_frame = 0
         self.anim_timer = 0
         self.idle_offset = 0
         self.moving = False
+        self.facing_left = False
 
     def draw_at(self, offset_x, offset_y):
-        y_offset = self.idle_offset if self.anim_state == "idle" else 0
-        sprite = self.sprites[self.anim_state][self.anim_frame]
+        y_offset = self.idle_offset if "idle" in self.anim_state else 0
+        direction = "_left" if self.facing_left else ""
+        state = self.anim_state.replace("_left", "")
+        sprite_list = self.sprites[f"{state}{direction}"]
+        sprite = sprite_list[self.anim_frame]
         screen.blit(sprite, (offset_x + self.pos_x, offset_y + self.pos_y + y_offset))
 
     def update(self):
-        # Controle de estados de animação
         new_state = "walk" if self.moving else "idle"
         if new_state != self.anim_state:
             self.anim_state = new_state
-            self.anim_frame = 0  # Reset ao mudar estado
+            self.anim_frame = 0
         
-        # Atualização do tempo de animação
         anim_speed = WALK_ANIM_SPEED if self.moving else IDLE_ANIM_SPEED
         self.anim_timer += anim_speed
         
-        # Atualização do frame com ciclo seguro
         if self.anim_timer >= 1:
             self.anim_timer = 0
-            max_frames = len(self.sprites[self.anim_state])
+            max_frames = len(self.sprites["idle"])  # Todas as listas tem o mesmo tamanho
             self.anim_frame = (self.anim_frame + 1) % max_frames
         
-        # Movimento vertical suave no idle
         if self.anim_state == "idle":
             self.idle_offset = int(math.sin(self.anim_timer * 2.2) * BOB_HEIGHT)
         
-        # Lógica de movimento
         if self.moving:
             dx = (self.x * TILE_SIZE - self.pos_x)
             dy = (self.y * TILE_SIZE - self.pos_y)
@@ -138,7 +139,9 @@ class Enemy:
         self.speed = 3.8
         self.sprites = {
             "idle": ["enemy_idle1", "enemy_idle2"],
-            "walk": ["enemy_walk1", "enemy_walk2", "enemy_walk3"]
+            "walk": ["enemy_walk1", "enemy_walk2", "enemy_walk3"],
+            "idle_left": ["enemy_idle1left", "enemy_idle2left"],
+            "walk_left": ["enemy_walk1left", "enemy_walk2left", "enemy_walk3left"]
         }
         self.anim_state = "idle"
         self.anim_frame = 0
@@ -148,45 +151,45 @@ class Enemy:
         self.direction = 1
         self.patrol_min = patrol_min
         self.patrol_max = patrol_max
+        self.facing_left = False
 
     def draw_at(self, offset_x, offset_y):
-        y_offset = self.idle_offset if self.anim_state == "idle" else 0
-        screen.blit(self.sprites[self.anim_state][self.anim_frame], 
-                   (offset_x + self.pos_x, offset_y + self.pos_y + y_offset))
+        y_offset = self.idle_offset if "idle" in self.anim_state else 0
+        direction = "_left" if self.facing_left else ""
+        state = self.anim_state.replace("_left", "")
+        sprite_list = self.sprites[f"{state}{direction}"]
+        sprite = sprite_list[self.anim_frame]
+        screen.blit(sprite, (offset_x + self.pos_x, offset_y + self.pos_y + y_offset))
 
     def update(self):
-        # Controle de estados de animação
         new_state = "walk" if self.moving else "idle"
         if new_state != self.anim_state:
             self.anim_state = new_state
-            self.anim_frame = 0  # Reset ao mudar estado
+            self.anim_frame = 0
         
-        # Atualização do tempo de animação
         anim_speed = WALK_ANIM_SPEED if self.moving else IDLE_ANIM_SPEED * 1.5
         self.anim_timer += anim_speed
         
-        # Atualização do frame com ciclo seguro
         if self.anim_timer >= 1:
             self.anim_timer = 0
-            max_frames = len(self.sprites[self.anim_state])
+            max_frames = len(self.sprites["idle"])  # Todas as listas tem o mesmo tamanho
             self.anim_frame = (self.anim_frame + 1) % max_frames
         
-        # Movimento vertical suave no idle
         if self.anim_state == "idle":
             self.idle_offset = int(math.sin(self.anim_timer * 3) * (BOB_HEIGHT-1))
         
-        # Lógica de patrulha
         if not self.moving:
             next_x = self.x + self.direction
             if next_x < self.patrol_min or next_x > self.patrol_max or game_map[self.y][next_x] != ".":
                 self.direction *= -1
                 next_x = self.x + self.direction
+                self.facing_left = self.direction < 0
             
             if game_map[self.y][next_x] == ".":
                 self.x = next_x
                 self.moving = True
+                self.facing_left = self.direction < 0
         
-        # Movimento horizontal
         if self.moving:
             dx = (self.x * TILE_SIZE - self.pos_x)
             dist = abs(dx)
@@ -217,10 +220,8 @@ def draw_menu():
         screen.draw.textbox(item["label"], item["rect"], color=color)
 
 def render_game():
-    # Preencha toda a tela com cor base (caso hajam lacunas)
     screen.draw.filled_rect(Rect(0, 0, WIDTH, HEIGHT), (60, 100, 60))
     
-    # Desenhe o background em padrão tile
     bg = images.background
     bg_width = bg.get_width()
     bg_height = bg.get_height()
@@ -228,13 +229,11 @@ def render_game():
         for y in range(0, HEIGHT, bg_height):
             screen.blit("background", (x, y))
     
-    # Calcule dimensões do mapa para posicionar elementos
     map_w = len(game_map[0]) * TILE_SIZE
     map_h = len(game_map) * TILE_SIZE
     offset_x = (WIDTH - map_w) // 2
     offset_y = (HEIGHT - map_h) // 2
 
-    # Personagens
     hero.draw_at(offset_x, offset_y)
     for enemy in enemies:
         enemy.draw_at(offset_x, offset_y)
@@ -283,6 +282,10 @@ def on_key_down(key):
         if game_map[new_y][new_x] == ".":
             hero.x, hero.y = new_x, new_y
             hero.moving = True
+            if move[0] < 0:
+                hero.facing_left = True
+            elif move[0] > 0:
+                hero.facing_left = False
             play_step()
 
 def update(dt):
@@ -291,8 +294,7 @@ def update(dt):
     if not menu_active:
         score_timer += dt
         spawn_enemy_timer += dt
-        survival_timer += dt
-        
+        survival_timer += dt        
         if score_timer >= score_interval:
             score += 10
             score_timer = 0
@@ -322,7 +324,7 @@ def spawn_enemy():
     
     if valid_pos:
         x, y = random.choice(valid_pos)
-        enemies.append(Enemy(x, y, 0, min(len(game_map[0]), -1)))
+        enemies.append(Enemy(x, y, 0, len(game_map[0])-1))
 
 def reset_game():
     global hero, enemies, score, lives, score_timer, spawn_enemy_timer, survival_timer
