@@ -8,7 +8,7 @@ Um roguelike simples feito em Python com PgZero., para o teste técnico da kodla
 pip install pgzero pygame
 
 2. Execute o jogo:
-python -m pgzero main.py
+python -m pgzero main.py 
 
 
 ## Controles
@@ -17,6 +17,7 @@ python -m pgzero main.py
 
 ## Regras
 - Sobreviva o máximo que puder!
-- A cada 30 segundos sem morrer, ganha 1 vida.
+- Ganhe pontos por mais tempo vivo.
+- A cada 25 segundos sem morrer, ganha 1 vida.
 - Colidir com inimigos perde uma vida.
 - Game Over ao perder todas as vidas.
