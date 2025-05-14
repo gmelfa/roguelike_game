@@ -3,25 +3,30 @@ WIDTH = 800
 HEIGHT = 600
 
 import random
+import math
 from pygame import Rect
 
-# --- Música e Sons ---
+# --- Configurações de Áudio ---
 music_loaded = False
 music_on = True
 
-# Sistema de pontuação e timers
+# --- Sistema do Jogo ---
 score = 0
 alive_time = 0
 score_timer = 0
-score_interval = 3
+score_interval = 2
 spawn_enemy_timer = 0
-spawn_enemy_interval = 10
-
-# Sistema de vidas
-lives = 3
+spawn_enemy_interval = 8
+lives = 1
 survival_timer = 0
-survival_reward_time = 30  # segundos para ganhar 1 vida extra
+survival_reward_time = 25
 
+# --- Parâmetros de Animação ---
+IDLE_ANIM_SPEED = 0.1
+WALK_ANIM_SPEED = 0.15
+BOB_HEIGHT = 3
+
+# --- Funções de Áudio ---
 def play_step():
     if music_on:
         sounds.step.play()
@@ -39,281 +44,294 @@ def start_music():
     if music_on and not music_loaded:
         music.play("bgm")
         music_loaded = True
-    elif not music_on:
-        music.stop()
-        music_loaded = False
 
 def toggle_music():
     global music_on, music_loaded
     music_on = not music_on
     if music_on:
         music.play("bgm")
-        music_loaded = True
     else:
         music.stop()
-        music_loaded = False
 
-# --- Menu State ---
+# --- Menu Principal ---
 menu_items = [
-    {"label": "Start Game", "rect": Rect((300, 200), (200, 60)), "action": "start"},
-    {"label": "Music: ON", "rect": Rect((300, 280), (200, 60)), "action": "toggle_music"},
-    {"label": "Exit", "rect": Rect((300, 360), (200, 60)), "action": "exit"},
+    {"label": "Iniciar Jogo", "rect": Rect(300, 200, 200, 60), "action": "start"},
+    {"label": "Música: ON", "rect": Rect(300, 280, 200, 60), "action": "toggle_music"},
+    {"label": "Sair", "rect": Rect(300, 360, 200, 60), "action": "exit"},
 ]
-
 menu_active = True
 
-# --- Game State ---
+# --- Mapa do Jogo ---
 game_map = [
-    "############",
-    "#..........#",
-    "#..........#",
-    "#..........#",
-    "#..........#",
-    "#..........#",
-    "#..........#",
-    "############",
+    "............",
+    "............",
+    "............",
+    "............",
+    "............",
+    "............",
+    "............",
+    "............",
 ]
-TILE_SIZE = 48
+TILE_SIZE = 64
 
 class Hero:
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.target_x = x
-        self.target_y = y
+        self.x, self.y = x, y
         self.pos_x = x * TILE_SIZE
         self.pos_y = y * TILE_SIZE
-        self.speed = 6
-        self.sprites = ["hero_idle", "hero_walk1", "hero_walk2"]
-        self.anim_index = 0
+        self.speed = 5.5
+        self.sprites = {
+            "idle": ["hero_idle1", "hero_idle2", "hero_idle3"],
+            "walk": ["hero_walk1", "hero_walk2", "hero_walk3", "hero_walk2"]
+        }
+        self.anim_state = "idle"
+        self.anim_frame = 0
         self.anim_timer = 0
-        self.anim_speed = 0.2
+        self.idle_offset = 0
         self.moving = False
 
     def draw_at(self, offset_x, offset_y):
-        sprite = self.sprites[self.anim_index]
-        screen.blit(sprite, (offset_x + self.pos_x, offset_y + self.pos_y))
+        y_offset = self.idle_offset if self.anim_state == "idle" else 0
+        sprite = self.sprites[self.anim_state][self.anim_frame]
+        screen.blit(sprite, (offset_x + self.pos_x, offset_y + self.pos_y + y_offset))
 
     def update(self):
+        # Controle de estados de animação
+        new_state = "walk" if self.moving else "idle"
+        if new_state != self.anim_state:
+            self.anim_state = new_state
+            self.anim_frame = 0  # Reset ao mudar estado
+        
+        # Atualização do tempo de animação
+        anim_speed = WALK_ANIM_SPEED if self.moving else IDLE_ANIM_SPEED
+        self.anim_timer += anim_speed
+        
+        # Atualização do frame com ciclo seguro
+        if self.anim_timer >= 1:
+            self.anim_timer = 0
+            max_frames = len(self.sprites[self.anim_state])
+            self.anim_frame = (self.anim_frame + 1) % max_frames
+        
+        # Movimento vertical suave no idle
+        if self.anim_state == "idle":
+            self.idle_offset = int(math.sin(self.anim_timer * 2.2) * BOB_HEIGHT)
+        
+        # Lógica de movimento
         if self.moving:
-            dx = self.target_x * TILE_SIZE - self.pos_x
-            dy = self.target_y * TILE_SIZE - self.pos_y
-            distance = (dx**2 + dy**2)**0.5
-            if distance <= self.speed:
-                self.pos_x = self.target_x * TILE_SIZE
-                self.pos_y = self.target_y * TILE_SIZE
+            dx = (self.x * TILE_SIZE - self.pos_x)
+            dy = (self.y * TILE_SIZE - self.pos_y)
+            dist = math.hypot(dx, dy)
+            
+            if dist <= self.speed:
+                self.pos_x = self.x * TILE_SIZE
+                self.pos_y = self.y * TILE_SIZE
                 self.moving = False
-                self.anim_index = 0
             else:
-                self.pos_x += dx * (self.speed / distance)
-                self.pos_y += dy * (self.speed / distance)
-                self.anim_timer += self.anim_speed
-                if self.anim_timer >= 1:
-                    self.anim_timer = 0
-                    self.anim_index = 1 if self.anim_index == 2 else 2
+                self.pos_x += dx * (self.speed / dist)
+                self.pos_y += dy * (self.speed / dist)
 
 class Enemy:
     def __init__(self, x, y, patrol_min, patrol_max):
-        self.x = x
-        self.y = y
-        self.target_x = x
-        self.target_y = y
+        self.x, self.y = x, y
         self.pos_x = x * TILE_SIZE
         self.pos_y = y * TILE_SIZE
-        self.speed = 4
-        self.sprites = ["enemy_idle", "enemy_walk1", "enemy_walk2"]
-        self.anim_index = 0
+        self.speed = 3.8
+        self.sprites = {
+            "idle": ["enemy_idle1", "enemy_idle2"],
+            "walk": ["enemy_walk1", "enemy_walk2", "enemy_walk3"]
+        }
+        self.anim_state = "idle"
+        self.anim_frame = 0
         self.anim_timer = 0
-        self.anim_speed = 0.18
+        self.idle_offset = 0
         self.moving = False
         self.direction = 1
         self.patrol_min = patrol_min
         self.patrol_max = patrol_max
 
     def draw_at(self, offset_x, offset_y):
-        sprite = self.sprites[self.anim_index]
-        screen.blit(sprite, (offset_x + self.pos_x, offset_y + self.pos_y))
+        y_offset = self.idle_offset if self.anim_state == "idle" else 0
+        screen.blit(self.sprites[self.anim_state][self.anim_frame], 
+                   (offset_x + self.pos_x, offset_y + self.pos_y + y_offset))
 
     def update(self):
+        # Controle de estados de animação
+        new_state = "walk" if self.moving else "idle"
+        if new_state != self.anim_state:
+            self.anim_state = new_state
+            self.anim_frame = 0  # Reset ao mudar estado
+        
+        # Atualização do tempo de animação
+        anim_speed = WALK_ANIM_SPEED if self.moving else IDLE_ANIM_SPEED * 1.5
+        self.anim_timer += anim_speed
+        
+        # Atualização do frame com ciclo seguro
+        if self.anim_timer >= 1:
+            self.anim_timer = 0
+            max_frames = len(self.sprites[self.anim_state])
+            self.anim_frame = (self.anim_frame + 1) % max_frames
+        
+        # Movimento vertical suave no idle
+        if self.anim_state == "idle":
+            self.idle_offset = int(math.sin(self.anim_timer * 3) * (BOB_HEIGHT-1))
+        
+        # Lógica de patrulha
         if not self.moving:
             next_x = self.x + self.direction
             if next_x < self.patrol_min or next_x > self.patrol_max or game_map[self.y][next_x] != ".":
                 self.direction *= -1
                 next_x = self.x + self.direction
+            
             if game_map[self.y][next_x] == ".":
                 self.x = next_x
-                self.target_x = next_x
                 self.moving = True
+        
+        # Movimento horizontal
         if self.moving:
-            dx = self.target_x * TILE_SIZE - self.pos_x
-            dy = self.target_y * TILE_SIZE - self.pos_y
-            distance = (dx**2 + dy**2)**0.5
-            if distance <= self.speed:
-                self.pos_x = self.target_x * TILE_SIZE
-                self.pos_y = self.target_y * TILE_SIZE
+            dx = (self.x * TILE_SIZE - self.pos_x)
+            dist = abs(dx)
+            
+            if dist <= self.speed:
+                self.pos_x = self.x * TILE_SIZE
                 self.moving = False
-                self.anim_index = 0
             else:
-                self.pos_x += dx * (self.speed / distance)
-                self.pos_y += dy * (self.speed / distance)
-                self.anim_timer += self.anim_speed
-                if self.anim_timer >= 1:
-                    self.anim_timer = 0
-                    self.anim_index = 1 if self.anim_index == 2 else 2
+                self.pos_x += dx * (self.speed / dist)
 
-def create_initial_enemies():
-    return [
-        Enemy(5, 2, 2, 9),
-        Enemy(7, 5, 4, 9),
-    ]
-
-hero = Hero(1, 1)
-enemies = create_initial_enemies()
-
-def draw_score():
-    screen.draw.text(f"Score: {score}", (10, 10), fontsize=40, color="white")
-
-def draw_lives():
-    screen.draw.text(f"Lives: {lives}", (10, 50), fontsize=40, color="white")
+# --- Inicialização do Jogo ---
+hero = Hero(0, 0)
+enemies = [Enemy(5, 1, 1, 11), Enemy(7, 5, 4, 11)]
 
 def draw():
     screen.clear()
     if menu_active:
         draw_menu()
     else:
-        draw_game()
-        draw_score()
-        draw_lives()
+        render_game()
+        draw_ui()
 
 def draw_menu():
-    screen.draw.text("Roguelike Game", center=(WIDTH//2, 120), fontsize=70, color="white")
+    screen.draw.text("Roguelike", center=(400, 120), fontsize=90, color="#7FDBFF")
     for item in menu_items:
-        screen.draw.filled_rect(item["rect"], (60, 60, 60))
-        screen.draw.rect(item["rect"], (200, 200, 200))
-        screen.draw.text(
-            item["label"],
-            center=item["rect"].center,
-            fontsize=40,
-            color="white"
-        )
+        color = "#2ECC40" if item["action"] == "toggle_music" and music_on else "#FFFFFF"
+        screen.draw.filled_rect(item["rect"], "#1F2F3F")
+        screen.draw.textbox(item["label"], item["rect"], color=color)
 
-def draw_game():
-    map_width = len(game_map[0]) * TILE_SIZE
-    map_height = len(game_map) * TILE_SIZE
-    map_x = (WIDTH - map_width) // 2
-    map_y = (HEIGHT - map_height) // 2
+def render_game():
+    # Preencha toda a tela com cor base (caso hajam lacunas)
+    screen.draw.filled_rect(Rect(0, 0, WIDTH, HEIGHT), (60, 100, 60))
+    
+    # Desenhe o background em padrão tile
+    bg = images.background
+    bg_width = bg.get_width()
+    bg_height = bg.get_height()
+    for x in range(0, WIDTH, bg_width):
+        for y in range(0, HEIGHT, bg_height):
+            screen.blit("background", (x, y))
+    
+    # Calcule dimensões do mapa para posicionar elementos
+    map_w = len(game_map[0]) * TILE_SIZE
+    map_h = len(game_map) * TILE_SIZE
+    offset_x = (WIDTH - map_w) // 2
+    offset_y = (HEIGHT - map_h) // 2
 
-    screen.draw.filled_rect(Rect((0, 0), (WIDTH, HEIGHT)), (60, 60, 60))
-    screen.blit("background", (map_x, map_y))
-
-    for y, row in enumerate(game_map):
-        for x, cell in enumerate(row):
-            if cell == "#":
-                color = (80, 80, 80)
-                screen.draw.filled_rect(
-                    Rect((map_x + x*TILE_SIZE, map_y + y*TILE_SIZE), (TILE_SIZE, TILE_SIZE)), color)
-    hero.draw_at(map_x, map_y)
+    # Personagens
+    hero.draw_at(offset_x, offset_y)
     for enemy in enemies:
-        enemy.draw_at(map_x, map_y)
+        enemy.draw_at(offset_x, offset_y)
+
+def draw_ui():
+    screen.draw.text(f"SCORE: {score}", (15, 15), fontsize=42, color="#FFD700")
+    screen.draw.text(f"LIVES: {'<3 ' * lives}", (15, 65), fontsize=42, color="#FF4136")
 
 def on_mouse_down(pos):
     global menu_active
-    if not menu_active:
-        return
-    for item in menu_items:
-        if item["rect"].collidepoint(pos):
-            if item["action"] == "start":
-                menu_active = False
-                start_music()
-            elif item["action"] == "toggle_music":
-                toggle_music()
-                item["label"] = f"Music: {'ON' if music_on else 'OFF'}"
-            elif item["action"] == "exit":
-                quit()
+    if menu_active:
+        for item in menu_items:
+            if item["rect"].collidepoint(pos):
+                handle_menu_action(item["action"])
+
+def handle_menu_action(action):
+    global menu_active
+    if action == "start":
+        menu_active = False
+        start_music()
+    elif action == "toggle_music":
+        toggle_music()
+        menu_items[1]["label"] = f"Música: {'ON' if music_on else 'OFF'}"
+    elif action == "exit":
+        quit()
 
 def on_key_down(key):
     if menu_active or hero.moving:
         return
-
-    dx, dy = 0, 0
-    if key == keys.LEFT or key == keys.A:
-        dx = -1
-    elif key == keys.RIGHT or key == keys.D:
-        dx = 1
-    elif key == keys.UP or key == keys.W:
-        dy = -1
-    elif key == keys.DOWN or key == keys.S:
-        dy = 1
-
-    new_x = hero.x + dx
-    new_y = hero.y + dy
-
-    if game_map[new_y][new_x] == ".":
-        hero.x = new_x
-        hero.y = new_y
-        hero.target_x = new_x
-        hero.target_y = new_y
-        hero.moving = True
-        play_step()
-
-def spawn_enemy():
-    valid_positions = []
-    for y in range(1, len(game_map)-1):
-        for x in range(1, len(game_map[0])-1):
-            if (
-                game_map[y][x] == "." 
-                and not any(e.x == x and e.y == y for e in enemies) 
-                and not (hero.x == x and hero.y == y)
-            ):
-                valid_positions.append((x, y))
-    if valid_positions:
-        x, y = random.choice(valid_positions)
-        enemies.append(Enemy(x, y, max(1, x-3), min(len(game_map[0])-2, x+3)))
-
-def reset_game():
-    global hero, enemies, score, alive_time, spawn_enemy_timer, score_timer, lives, survival_timer
-    lives -= 1
-    survival_timer = 0
-    if lives <= 0:
-        # Game Over - reinicia tudo
-        hero = Hero(1, 1)
-        enemies = create_initial_enemies()
-        score = 0
-        alive_time = 0
-        spawn_enemy_timer = 0
-        score_timer = 0
-        lives = 3
-    else:
-        # Continua com menos uma vida
-        hero = Hero(1, 1)
-        enemies = create_initial_enemies()
+    
+    move = {
+        keys.LEFT: (-1, 0),
+        keys.RIGHT: (1, 0),
+        keys.UP: (0, -1),
+        keys.DOWN: (0, 1),
+        keys.A: (-1, 0),
+        keys.D: (1, 0),
+        keys.W: (0, -1),
+        keys.S: (0, 1)
+    }.get(key, (0, 0))
+    
+    new_x = hero.x + move[0]
+    new_y = hero.y + move[1]
+    
+    if 0 <= new_x < len(game_map[0]) and 0 <= new_y < len(game_map):
+        if game_map[new_y][new_x] == ".":
+            hero.x, hero.y = new_x, new_y
+            hero.moving = True
+            play_step()
 
 def update(dt):
-    global alive_time, score, spawn_enemy_timer, score_timer, survival_timer, lives
+    global score, spawn_enemy_timer, score_timer, survival_timer, lives
+    
     if not menu_active:
-        alive_time += dt
-        spawn_enemy_timer += dt
         score_timer += dt
+        spawn_enemy_timer += dt
         survival_timer += dt
         
         if score_timer >= score_interval:
-            score += 1
+            score += 10
             score_timer = 0
-            
+        
         if spawn_enemy_timer >= spawn_enemy_interval:
             spawn_enemy()
             spawn_enemy_timer = 0
-            
+        
         if survival_timer >= survival_reward_time:
-            lives += 1
+            lives = min(5, lives + 1)
             survival_timer = 0
             play_powerup()
-            
+        
         hero.update()
-        for enemy in enemies:
+        for enemy in enemies[:]:
             enemy.update()
-            
-        for enemy in enemies:
-            if int(hero.x) == int(enemy.x) and int(hero.y) == int(enemy.y):
+            if int(hero.x) == enemy.x and int(hero.y) == enemy.y:
                 play_hit()
                 reset_game()
+
+def spawn_enemy():
+    valid_pos = [(x, y) for y in range(1, len(game_map)-1) 
+                for x in range(1, len(game_map[0])-1) 
+                if game_map[y][x] == "." 
+                and not any(e.x == x and e.y == y for e in enemies)
+                and (x, y) != (hero.x, hero.y)]
+    
+    if valid_pos:
+        x, y = random.choice(valid_pos)
+        enemies.append(Enemy(x, y, 0, min(len(game_map[0]), -1)))
+
+def reset_game():
+    global hero, enemies, score, lives, score_timer, spawn_enemy_timer, survival_timer
+    lives -= 1
+    if lives <= 0:
+        lives = 1
+        score = 0
+        score_timer = 0
+        spawn_enemy_timer = 0
+        survival_timer = 0
+    hero = Hero(1, 1)
+    enemies = [Enemy(5, 1, 1, 11), Enemy(7, 5, 4, 11)]
