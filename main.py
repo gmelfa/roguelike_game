@@ -56,10 +56,10 @@ def toggle_music():
 # --- Menu Principal ---
 menu_items = [
     {"label": "Iniciar Jogo", "rect": Rect(300, 200, 200, 60), "action": "start"},
-    {"label": "Música: ON", "rect": Rect(300, 280, 200, 60), "action": "toggle_music"},
+    {"label": "Music: ON", "rect": Rect(300, 280, 200, 60), "action": "toggle_music"},
     {"label": "Sair", "rect": Rect(300, 360, 200, 60), "action": "exit"},
 ]
-menu_active = True
+menu_active = True  # ALTERAÇÃO: Certifique-se que está global
 
 # --- Mapa do Jogo ---
 game_map = [
@@ -184,7 +184,6 @@ class Enemy:
                 self.direction *= -1
                 next_x = self.x + self.direction
                 self.facing_left = self.direction < 0
-            
             if game_map[self.y][next_x] == ".":
                 self.x = next_x
                 self.moving = True
@@ -240,7 +239,7 @@ def render_game():
 
 def draw_ui():
     screen.draw.text(f"SCORE: {score}", (15, 15), fontsize=42, color="#FFD700")
-    screen.draw.text(f"LIVES: {'<3 ' * lives}", (15, 65), fontsize=42, color="#FF4136")
+    screen.draw.text(f"LIVES: {'O ' * lives}", (15, 65), fontsize=42, color="#FF4136")
 
 def on_mouse_down(pos):
     global menu_active
@@ -256,7 +255,7 @@ def handle_menu_action(action):
         start_music()
     elif action == "toggle_music":
         toggle_music()
-        menu_items[1]["label"] = f"Música: {'ON' if music_on else 'OFF'}"
+        menu_items[1]["label"] = f"Music: {'ON' if music_on else 'OFF'}"
     elif action == "exit":
         quit()
 
@@ -327,13 +326,20 @@ def spawn_enemy():
         enemies.append(Enemy(x, y, 0, len(game_map[0])-1))
 
 def reset_game():
-    global hero, enemies, score, lives, score_timer, spawn_enemy_timer, survival_timer
+    global hero, enemies, score, lives, score_timer, spawn_enemy_timer, survival_timer, menu_active  # ALTERAÇÃO
     lives -= 1
     if lives <= 0:
+        # ALTERAÇÃO: Volta ao menu e reinicia o jogo
+        menu_active = True
+        # Reinicia tudo para o estado inicial
         lives = 1
         score = 0
         score_timer = 0
         spawn_enemy_timer = 0
         survival_timer = 0
+        hero = Hero(1, 1)
+        enemies = [Enemy(5, 1, 1, 11), Enemy(7, 5, 4, 11)]
+        return
+    # Restante do reset normal (quando ainda tem vidas)
     hero = Hero(1, 1)
     enemies = [Enemy(5, 1, 1, 11), Enemy(7, 5, 4, 11)]
