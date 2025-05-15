@@ -59,7 +59,7 @@ menu_items = [
     {"label": "Music: ON", "rect": Rect(300, 280, 200, 60), "action": "toggle_music"},
     {"label": "Sair", "rect": Rect(300, 360, 200, 60), "action": "exit"},
 ]
-menu_active = True  # ALTERAÇÃO: Certifique-se que está global
+menu_active = True
 
 # --- Mapa do Jogo ---
 game_map = [
@@ -112,7 +112,7 @@ class Hero:
         
         if self.anim_timer >= 1:
             self.anim_timer = 0
-            max_frames = len(self.sprites["idle"])  # Todas as listas tem o mesmo tamanho
+            max_frames = len(self.sprites["idle"])  
             self.anim_frame = (self.anim_frame + 1) % max_frames
         
         if self.anim_state == "idle":
@@ -172,7 +172,7 @@ class Enemy:
         
         if self.anim_timer >= 1:
             self.anim_timer = 0
-            max_frames = len(self.sprites["idle"])  # Todas as listas tem o mesmo tamanho
+            max_frames = len(self.sprites["idle"])  
             self.anim_frame = (self.anim_frame + 1) % max_frames
         
         if self.anim_state == "idle":
@@ -329,9 +329,9 @@ def reset_game():
     global hero, enemies, score, lives, score_timer, spawn_enemy_timer, survival_timer, menu_active  # ALTERAÇÃO
     lives -= 1
     if lives <= 0:
-        # ALTERAÇÃO: Volta ao menu e reinicia o jogo
+        
         menu_active = True
-        # Reinicia tudo para o estado inicial
+        
         lives = 1
         score = 0
         score_timer = 0
@@ -340,6 +340,6 @@ def reset_game():
         hero = Hero(1, 1)
         enemies = [Enemy(5, 1, 1, 11), Enemy(7, 5, 4, 11)]
         return
-    # Restante do reset normal (quando ainda tem vidas)
+    
     hero = Hero(1, 1)
     enemies = [Enemy(5, 1, 1, 11), Enemy(7, 5, 4, 11)]
