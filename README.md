@@ -1,6 +1,6 @@
 # Roguelike Game
 
-Um roguelike simples feito em Python com PgZero., para o teste técnico da kodland.
+Um roguelike simples feito em Python com PgZero, para o teste técnico da kodland.
 
 ## Como rodar
 
