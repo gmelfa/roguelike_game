@@ -1,7 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 TITLE = "Roguelike Game"
 WIDTH = 800
 HEIGHT = 600
 
+import pgzrun
 import random
 import math
 from pygame import Rect
@@ -112,7 +115,7 @@ class Hero:
         
         if self.anim_timer >= 1:
             self.anim_timer = 0
-            max_frames = len(self.sprites["idle"])  
+            max_frames = len(self.sprites["idle"])  # Todas as listas tem o mesmo tamanho
             self.anim_frame = (self.anim_frame + 1) % max_frames
         
         if self.anim_state == "idle":
@@ -172,7 +175,7 @@ class Enemy:
         
         if self.anim_timer >= 1:
             self.anim_timer = 0
-            max_frames = len(self.sprites["idle"])  
+            max_frames = len(self.sprites["idle"])  # Todas as listas tem o mesmo tamanho
             self.anim_frame = (self.anim_frame + 1) % max_frames
         
         if self.anim_state == "idle":
@@ -326,12 +329,10 @@ def spawn_enemy():
         enemies.append(Enemy(x, y, 0, len(game_map[0])-1))
 
 def reset_game():
-    global hero, enemies, score, lives, score_timer, spawn_enemy_timer, survival_timer, menu_active  # ALTERAÇÃO
+    global hero, enemies, score, lives, score_timer, spawn_enemy_timer, survival_timer, menu_active
     lives -= 1
     if lives <= 0:
-        
         menu_active = True
-        
         lives = 1
         score = 0
         score_timer = 0
@@ -340,6 +341,7 @@ def reset_game():
         hero = Hero(1, 1)
         enemies = [Enemy(5, 1, 1, 11), Enemy(7, 5, 4, 11)]
         return
-    
     hero = Hero(1, 1)
     enemies = [Enemy(5, 1, 1, 11), Enemy(7, 5, 4, 11)]
+
+pgzrun.go()
